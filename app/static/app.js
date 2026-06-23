@@ -226,26 +226,44 @@ document.getElementById("backfillBtn").addEventListener("click", async () => {
 /* ---------- export / import ---------- */
 document.getElementById("exportBtn").addEventListener("click", async () => {
   const btn = document.getElementById("exportBtn");
+  const from = document.getElementById("exportFrom").value;
+  const to = document.getElementById("exportTo").value;
+  if (from && to && from > to) { toast("'From' must be on or before 'To'", false); return; }
+  const params = new URLSearchParams();
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  const qs = params.toString();
   btn.disabled = true; btn.textContent = "Exporting…";
   try {
-    const res = await fetch("/api/export", { headers: authHeaders() });
+    const res = await fetch("/api/export" + (qs ? "?" + qs : ""), { headers: authHeaders() });
     if (!res.ok) {
       let detail = `${res.status} ${res.statusText}`;
       if (res.status === 404) detail += " — restart the server and hard-refresh (the export endpoint is new)";
       try { detail = (await res.json()).detail || detail; } catch (_) {}
       throw new Error(`Export failed: ${detail}`);
     }
-    const blob = await res.blob();
+    const text = await res.text();
+    let count = null;
+    try { count = JSON.parse(text).prepvault_export.problems.length; } catch (_) {}
     const cd = res.headers.get("Content-Disposition") || "";
     const m = cd.match(/filename="?([^"]+)"?/);
     const name = m ? m[1] : "prepvault-export.json";
+    const blob = new Blob([text], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = name; document.body.appendChild(a); a.click();
     a.remove(); URL.revokeObjectURL(url);
-    toast("Exported your data");
+    const ranged = from || to;
+    toast(count === null
+      ? "Exported your data"
+      : `Exported ${count} problem(s)${ranged ? " in range" : ""}`);
   } catch (err) { toast(err.message, false); }
   finally { btn.disabled = false; btn.textContent = "Export data"; }
+});
+
+document.getElementById("exportClearRange").addEventListener("click", () => {
+  document.getElementById("exportFrom").value = "";
+  document.getElementById("exportTo").value = "";
 });
 
 document.getElementById("importBtn").addEventListener("click", () => {

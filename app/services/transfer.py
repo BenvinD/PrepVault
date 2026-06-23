@@ -71,6 +71,26 @@ def _comparable(dt: datetime | None) -> datetime | None:
     return dt
 
 
+def _solved_on(problem: Problem) -> date | None:
+    """The day a problem was solved, used for date-range export filtering."""
+    if problem.date_solved:
+        return problem.date_solved
+    if problem.first_solved_at:
+        return problem.first_solved_at.date()
+    return None
+
+
+def _within(d: date | None, lo: date | None, hi: date | None) -> bool:
+    """Inclusive range check. Undated rows match only when no range is set."""
+    if d is None:
+        return lo is None and hi is None
+    if lo is not None and d < lo:
+        return False
+    if hi is not None and d > hi:
+        return False
+    return True
+
+
 def _problem_to_dict(problem: Problem) -> dict:
     return {
         "judge": problem.judge,
@@ -111,8 +131,19 @@ def _submission_to_dict(sub: Submission) -> dict:
     }
 
 
-def export_data(db: Session, user: User) -> dict:
-    """Serialize the user's problems (+ submissions) and activity to a dict."""
+def export_data(
+    db: Session,
+    user: User,
+    *,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> dict:
+    """Serialize the user's problems (+ submissions) and activity to a dict.
+
+    With a date range, only problems solved within it (by their solved date)
+    and activity on days within it are exported; both bounds are inclusive and
+    optional. Undated problems are included only when no range is given.
+    """
     problems = db.execute(
         select(Problem).where(Problem.user_id == user.id).order_by(Problem.id)
     ).scalars().all()
@@ -120,23 +151,29 @@ def export_data(db: Session, user: User) -> dict:
         select(ActivityDay).where(ActivityDay.user_id == user.id).order_by(ActivityDay.id)
     ).scalars().all()
 
-    return {
-        "prepvault_export": {
-            "version": EXPORT_VERSION,
-            "app_version": __version__,
-            "exported_at": datetime.now().isoformat(timespec="seconds"),
-            "problems": [_problem_to_dict(p) for p in problems],
-            "activity_days": [
-                {
-                    "judge": a.judge,
-                    "account": a.account,
-                    "day": _iso(a.day),
-                    "count": a.count,
-                }
-                for a in activity
-            ],
-        }
+    ranged = date_from is not None or date_to is not None
+    if ranged:
+        problems = [p for p in problems if _within(_solved_on(p), date_from, date_to)]
+        activity = [a for a in activity if _within(a.day, date_from, date_to)]
+
+    envelope = {
+        "version": EXPORT_VERSION,
+        "app_version": __version__,
+        "exported_at": datetime.now().isoformat(timespec="seconds"),
+        "problems": [_problem_to_dict(p) for p in problems],
+        "activity_days": [
+            {
+                "judge": a.judge,
+                "account": a.account,
+                "day": _iso(a.day),
+                "count": a.count,
+            }
+            for a in activity
+        ],
     }
+    if ranged:
+        envelope["range"] = {"from": _iso(date_from), "to": _iso(date_to)}
+    return {"prepvault_export": envelope}
 
 
 def _new_submission(user_id: int, problem_id: int, sd: dict) -> Submission:

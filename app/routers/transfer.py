@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -24,11 +24,22 @@ router = APIRouter(prefix="/api", tags=["transfer"])
 
 @router.get("/export")
 def export_data(
+    date_from: date | None = Query(None, alias="from", description="Only problems solved on/after this date."),
+    date_to: date | None = Query(None, alias="to", description="Only problems solved on/before this date."),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> JSONResponse:
-    data = transfer.export_data(db, user)
-    filename = f"prepvault-export-{date.today().isoformat()}.json"
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "'from' date must be on or before 'to' date."
+        )
+    data = transfer.export_data(db, user, date_from=date_from, date_to=date_to)
+    if date_from or date_to:
+        lo = date_from.isoformat() if date_from else "start"
+        hi = date_to.isoformat() if date_to else date.today().isoformat()
+        filename = f"prepvault-export-{lo}_to_{hi}.json"
+    else:
+        filename = f"prepvault-export-{date.today().isoformat()}.json"
     return JSONResponse(
         content=data,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},

@@ -170,6 +170,21 @@
           submissions and activity — duplicates are skipped automatically. Judge
           cookies are never included.
         </p>
+        <div class="flex gap-3 items-end flex-wrap mb-2">
+          <div>
+            <label class="lbl">From</label>
+            <input id="exportFrom" type="date" class="input" />
+          </div>
+          <div>
+            <label class="lbl">To</label>
+            <input id="exportTo" type="date" class="input" />
+          </div>
+          <button id="exportClearRange" class="btn-ghost" title="Clear the range and export everything">All time</button>
+        </div>
+        <p class="text-xs text-muted mb-4">
+          Leave both empty to export everything. A range exports problems solved
+          within it (by solved date) and activity on those days.
+        </p>
         <div class="flex gap-2 items-center flex-wrap">
           <button id="exportBtn" class="btn-ghost">Export data</button>
           <button id="importBtn" class="btn-ghost">Import data</button>
