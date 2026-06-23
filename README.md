@@ -1,15 +1,16 @@
 # PrepVault
 
 **The open-source, local-first interview-prep tracker.** Pull every problem you've
-solved on **LeetCode, HackerRank and HelloInterview** into one place, get
-AI-written key insights, and let **spaced repetition** decide what to revise
-next — so you actually *retain* what you grind. Run it entirely on your own
-machine, or host it in the cloud for a whole community. Same codebase, swappable
-backends.
+solved on **LeetCode, HackerRank, CodeChef and HelloInterview** into one place,
+get AI-written key insights, and let a **smart spaced-repetition queue** decide
+what to revise next — so you actually *retain* what you grind. Run it entirely on
+your own machine, or host it in the cloud for a whole community. Same codebase,
+swappable backends.
 
-> **Why the name?** *Retrieval practice* — recalling something just before you'd
-> forget it — is the single most effective way to make knowledge stick. PrepVault
-> applies it to coding-interview prep.
+> **Why the name?** PrepVault is a private *vault* for your interview prep — every
+> problem you've ever solved locked in one place, then resurfaced by spaced
+> repetition right before you'd forget it. It's your prep, on your machine,
+> never lost.
 
 <p align="left">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white">
@@ -55,11 +56,11 @@ PrepVault is a single, self-hostable app that:
 |---|---|
 | **Dashboard** | Totals, difficulty breakdown, top topics, "due to revise", last-30-days activity. |
 | **Problems** | Searchable / filterable table; edit confidence, mark revised, delete, one-click AI insight, view submissions + code. |
-| **Revision queue** | Everything whose spaced-repetition date has arrived; grade it to reschedule. |
+| **Smart revision queue** | A prioritized queue served in small batches (5 at a time): due problems are ranked by how overdue they are, your weakest topics, confidence and difficulty. It surfaces your weak topics for interview prep, and you grade confidence (1–5) inline after each problem to reschedule it. |
 | **Activity** | A combined, GitHub-style contribution graph across **every** provider, with streaks and per-judge breakdowns. |
 | **Sync** | Pull your full solved list from LeetCode (cookie), HackerRank or CodeChef (public username + optional cookie). Connect **multiple accounts per judge**, resync any of them, and **unsync** one cleanly — removing only that account's problems, submissions and activity. |
 | **AI insights** | A short "key insight" per problem from any OpenAI-compatible LLM you configure. |
-| **Unified judges** | LeetCode, HackerRank and HelloInterview behind one `JudgeProvider` interface — adding Codeforces/AtCoder is a small, self-contained adapter. |
+| **Unified judges** | LeetCode, HackerRank, CodeChef and HelloInterview behind one `JudgeProvider` interface — adding Codeforces/AtCoder is a small, self-contained adapter. |
 | **Backup & transfer** | Export your data to a JSON file and import it on another machine — problems, submissions and activity merge with no duplicates (cookies excluded). |
 
 ---
@@ -171,7 +172,8 @@ app/
     sync.py            fetch solved problems, dedupe, enrich metadata
     submissions.py     fetch/store submissions + code, unified backfill
     activity.py        build the combined contribution calendar
-    revision.py        spaced-repetition scheduling
+    revision.py        spaced-repetition scheduling + smart priority queue + weak-topic scoring
+    transfer.py        export/import with de-dup + newest-wins merge
     insights.py        AI key insights (via the LLM gateway only)
     stats.py           dashboard aggregates
     presentation.py    unification layer -> one shape for the frontend
@@ -179,7 +181,7 @@ app/
     jobs.py            background-job lifecycle helpers
     llm/               LLM gateway boundary (gateway.py + types.py)
   workers/           Arq queue, tasks, dispatcher (inline fallback when no Redis)
-  routers/           REST API (problems, sync, submissions, auth, jobs)
+  routers/           REST API (problems, sync, submissions, auth, jobs, revision, transfer)
   static/            zero-build SPA (index.html + styles.css + app.js)
 ```
 
@@ -188,7 +190,7 @@ app/
 ```
 Browser (SPA)  ─HTTP/JSON─▶  FastAPI routers ─▶ services ─▶ SQLAlchemy ─▶ SQLite/Postgres
                                    │
-                                   ├─ providers/*  ──▶ LeetCode / HackerRank APIs
+                                   ├─ providers/*  ──▶ LeetCode / HackerRank / CodeChef APIs
                                    └─ insights      ──▶ OpenAI-compatible LLM
 ```
 
@@ -207,8 +209,9 @@ Browser (SPA)  ─HTTP/JSON─▶  FastAPI routers ─▶ services ─▶ SQLAlc
 ### Data model (essentials)
 
 - **User** — local sentinel user, or a real account in cloud mode.
-- **Problem** — slug, title, difficulty, topics, confidence, `first_solved_at`,
-  `last_revised`, `next_revision`, source judge.
+- **Problem** — slug, title, difficulty, topics, confidence, `revisit`,
+  `first_solved_at`, `last_revised`, `next_revision`, the source judge and the
+  `account` it was synced from (so multiple accounts per judge unsync cleanly).
 - **Submission** — per-attempt status, language, timestamp and code.
 - **JudgeCredential** — per-user, per-judge session tokens (git-ignored, only
   ever sent to that judge's API).
@@ -218,11 +221,25 @@ Browser (SPA)  ─HTTP/JSON─▶  FastAPI routers ─▶ services ─▶ SQLAlc
 
 ## How spaced repetition works
 
-Each problem carries a **confidence** score. When you mark a problem revised,
-PrepVault computes the next review date — low confidence resurfaces in days, high
-confidence in weeks — so the **Revision** tab always shows what you're closest to
-forgetting. `last_revised` automatically tracks your most recent accepted
-submission, and `next_revision` is derived from it.
+Each problem carries a **confidence** score (1–5). When you mark a problem
+revised you grade your confidence, and PrepVault computes the next review date —
+low confidence resurfaces in days, high confidence in weeks. `last_revised`
+automatically tracks your most recent accepted submission, and `next_revision`
+is derived from it.
+
+The **Revision** tab is a *smart, prioritized queue* rather than a flat due
+list. It serves problems in small batches (5 at a time) ordered by a score that
+blends:
+
+- **Overdue-ness** — how long past `next_revision` the problem is.
+- **Topic weakness** — topics where your average confidence is low (and topics
+  flagged for revisit) are weighted up, so interview-critical weak spots come
+  first. The queue response also returns your **weakest topics**.
+- **Confidence** — lower-confidence problems rank higher.
+- **Difficulty** — harder problems get a small boost.
+
+You clear the queue batch by batch until it's empty, grading confidence inline
+as you go.
 
 ---
 
@@ -236,9 +253,10 @@ GET    /api/stats                        dashboard aggregates
 GET    /api/providers                    available judges + capabilities
 GET    /api/activity                     combined contribution calendar
 GET/POST/PATCH/DELETE /api/problems      problem CRUD
-POST   /api/problems/{id}/revised        mark revised (reschedules)
+POST   /api/problems/{id}/revised        mark revised + grade confidence (reschedules)
 POST   /api/problems/{id}/insight        enqueue an AI key insight (returns a job)
 GET    /api/problems/{id}/submissions    submissions + code
+GET    /api/revision/queue               prioritized due batch + weakest topics
 POST   /api/sync                         pull solved problems from a judge (returns a job)
 POST   /api/sync/backfill                backfill submissions/activity (returns a job)
 GET    /api/jobs/{id}                    poll a background job's status + result
@@ -308,9 +326,10 @@ it behind HTTPS.
 ## Roadmap
 
 - More judges (Codeforces, AtCoder, NeetCode import).
-- Exports (Anki, Notion, CSV).
+- More export formats (Anki, Notion, CSV) on top of the built-in JSON backup/transfer.
 - Configurable spaced-repetition policies (SM-2 / FSRS).
-- Richer analytics: pattern mastery, weak-topic detection.
+- Richer analytics: pattern mastery and progress trends (weak-topic detection
+  already powers the smart revision queue).
 
 ## Contributing
 
