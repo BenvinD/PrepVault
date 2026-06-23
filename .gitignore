@@ -1,0 +1,12 @@
+.venv/
+cookies.json
+.env
+*.xlsx
+__pycache__/
+*.db
+.DS_Store
+github-profile/
+
+# legacy spreadsheet-workflow scripts (not part of the PrepVault app)
+leetcode_sync.py
+fill_insights.py

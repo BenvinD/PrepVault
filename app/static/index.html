@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrepVault — Interview Prep Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: "class", theme: { extend: { colors: {
+      ink: "#0b0d12", panel: "#13161d", panel2: "#1a1e27", line: "#262b36",
+      accent: "#6366f1", accent2: "#22d3ee", muted: "#8b93a7"
+    } } } };
+  </script>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="bg-ink text-slate-200 antialiased min-h-screen">
+  <!-- Top bar -->
+  <header class="border-b border-line bg-panel/80 backdrop-blur sticky top-0 z-20">
+    <div class="max-w-6xl mx-auto px-5 h-14 flex items-center gap-4">
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 rounded-md bg-accent grid place-items-center font-bold text-white">P</div>
+        <span class="font-semibold tracking-tight">PrepVault</span>
+        <span id="modeBadge" class="text-xs px-2 py-0.5 rounded-full border border-line text-muted">…</span>
+      </div>
+      <nav class="ml-6 hidden sm:flex items-center gap-1" id="tabs">
+        <button data-tab="dashboard" class="tab">Dashboard</button>
+        <button data-tab="activity" class="tab">Activity</button>
+        <button data-tab="problems" class="tab">Problems</button>
+        <button data-tab="revision" class="tab">Revision</button>
+        <button data-tab="sync" class="tab">Sync</button>
+      </nav>
+      <div class="ml-auto flex items-center gap-3" id="authArea"></div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-5 py-6">
+    <!-- Dashboard -->
+    <section data-view="dashboard" class="view">
+      <h1 class="text-xl font-semibold mb-4">Dashboard</h1>
+      <div id="statCards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6"></div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card">
+          <h2 class="card-title">By difficulty</h2>
+          <div id="byDifficulty" class="space-y-2"></div>
+        </div>
+        <div class="card">
+          <h2 class="card-title">Top topics</h2>
+          <div id="topTopics" class="flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Activity -->
+    <section data-view="activity" class="view hidden">
+      <div class="flex items-center gap-3 mb-4 flex-wrap">
+        <h1 class="text-xl font-semibold">Activity</h1>
+        <div id="yearPills" class="flex gap-1 flex-wrap"></div>
+        <button id="backfillBtn" class="btn-ghost ml-auto" title="Fetch full submission history from LeetCode to enrich the graph">Backfill history</button>
+      </div>
+      <div id="activityCards" class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6"></div>
+      <div class="card mb-4">
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h2 class="card-title !mb-0">Contribution graph — all providers</h2>
+          <div class="flex items-center gap-2 text-xs text-muted">
+            Less
+            <div id="legend" class="flex gap-1"></div>
+            More
+          </div>
+        </div>
+        <div id="heatmapWrap" class="overflow-x-auto"><div id="heatmap"></div></div>
+        <div id="dayDetail" class="mt-3"></div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4 mb-4">
+        <div class="card"><h2 class="card-title">Activity by month</h2><div id="byMonth" class="space-y-2"></div></div>
+        <div class="card"><h2 class="card-title">Activity by weekday</h2><div id="byWeekday" class="space-y-2"></div></div>
+      </div>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="card"><h2 class="card-title">By provider</h2><div id="byProvider" class="space-y-2"></div></div>
+        <div class="card"><h2 class="card-title">By difficulty</h2><div id="actByDifficulty" class="space-y-2"></div></div>
+        <div class="card"><h2 class="card-title">Top topics</h2><div id="actTopics" class="flex flex-wrap gap-2"></div></div>
+      </div>
+    </section>
+
+    <!-- Problems -->
+    <section data-view="problems" class="view hidden">
+      <div class="flex items-center gap-3 mb-4 flex-wrap">
+        <h1 class="text-xl font-semibold">Problems</h1>
+        <button id="addProblemBtn" class="btn-primary text-xs">+ Add problem</button>
+        <input id="search" placeholder="Search title or topic…" class="input ml-auto w-56" />
+        <select id="diffFilter" class="input w-32">
+          <option value="">All</option><option>Easy</option><option>Medium</option><option>Hard</option>
+        </select>
+      </div>
+      <div id="problemsTable" class="card p-0 overflow-hidden"></div>
+    </section>
+
+    <!-- Revision -->
+    <section data-view="revision" class="view hidden">
+      <h1 class="text-xl font-semibold mb-1">Revision queue</h1>
+      <p class="text-muted text-sm mb-4">A smart, weakness-aware queue — your hardest, most-overdue problems first, a few at a time.</p>
+      <div id="revisionSummary" class="mb-4"></div>
+      <div id="revisionProgress" class="mb-3"></div>
+      <div id="revisionList" class="space-y-2"></div>
+    </section>
+
+    <!-- Sync -->
+    <section data-view="sync" class="view hidden">
+      <h1 class="text-xl font-semibold mb-4">Sync from a judge</h1>
+      <div class="card max-w-xl">
+        <label class="lbl">Platform</label>
+        <select id="syncJudge" class="input w-full mb-4"></select>
+
+        <div id="lcFields">
+          <p class="text-sm text-muted mb-4">
+            Your username is required — it labels the account. Add a
+            <code class="code">LEETCODE_SESSION</code> cookie for your full solved
+            list; without it only recent submissions are imported.
+          </p>
+          <label class="lbl">LeetCode username *</label>
+          <input id="lcUser" class="input w-full mb-3" placeholder="leetcode username (required)" />
+          <label class="lbl">LEETCODE_SESSION cookie</label>
+          <input id="lcSession" class="input w-full mb-3" placeholder="paste cookie value (recommended)" />
+          <label class="lbl">csrftoken (optional)</label>
+          <input id="lcCsrf" class="input w-full mb-4" placeholder="optional" />
+        </div>
+
+        <div id="hrFields" class="hidden">
+          <p class="text-sm text-muted mb-4">
+            Your username imports every solved challenge. Add your
+            <code class="code">_hrank_session</code> cookie to also pull per-problem
+            submissions and view your code (like LeetCode).
+          </p>
+          <label class="lbl">HackerRank username</label>
+          <input id="hrUser" class="input w-full mb-3" placeholder="hackerrank username" />
+          <label class="lbl">_hrank_session cookie (optional)</label>
+          <input id="hrSession" class="input w-full mb-4" placeholder="paste cookie value to enable submissions + code" />
+        </div>
+
+        <div id="ccFields" class="hidden">
+          <p class="text-sm text-muted mb-4">
+            Your public username imports every <strong>accepted</strong> problem
+            (with first-solved dates and languages) plus your daily activity
+            calendar. No cookie needed.
+          </p>
+          <label class="lbl">CodeChef username</label>
+          <input id="ccUser" class="input w-full mb-4" placeholder="codechef username" />
+        </div>
+
+        <div id="syncNote" class="hidden text-sm text-amber-400/90 mb-4"></div>
+
+        <button id="syncBtn" class="btn-primary">Start sync</button>
+        <div id="syncResult" class="mt-3 text-sm"></div>
+      </div>
+
+      <div class="card max-w-xl mt-4">
+        <h2 class="card-title">Connected accounts</h2>
+        <p class="text-sm text-muted mb-4">
+          Every account you've synced, and how many problems came from it. Synced
+          the wrong profile? <strong>Unsync</strong> removes all of that account's
+          problems, submissions and activity — your other accounts stay intact.
+        </p>
+        <div id="accountsList" class="space-y-2"></div>
+      </div>
+
+      <div class="card max-w-xl mt-4">
+        <h2 class="card-title">Backup &amp; transfer</h2>
+        <p class="text-sm text-muted mb-4">
+          Move your data between machines. <strong>Export</strong> downloads a JSON
+          file; <strong>Import</strong> it on another machine to merge your problems,
+          submissions and activity — duplicates are skipped automatically. Judge
+          cookies are never included.
+        </p>
+        <div class="flex gap-2 items-center flex-wrap">
+          <button id="exportBtn" class="btn-ghost">Export data</button>
+          <button id="importBtn" class="btn-ghost">Import data</button>
+          <input id="importFile" type="file" accept="application/json,.json" class="hidden" />
+        </div>
+        <div id="transferResult" class="mt-3 text-sm"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Add-problem modal -->
+  <div id="modal" class="fixed inset-0 z-30 hidden items-center justify-center bg-black/60 p-4">
+    <div class="card w-full max-w-lg max-h-[90vh] overflow-auto">
+      <div class="flex items-center mb-4">
+        <h2 class="text-lg font-semibold">Add problem</h2>
+        <button id="modalClose" class="btn-ghost ml-auto">✕</button>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="col-span-2">
+          <label class="lbl">Platform</label>
+          <select id="mJudge" class="input w-full"></select>
+        </div>
+        <div class="col-span-2">
+          <label class="lbl">Title *</label>
+          <input id="mTitle" class="input w-full" placeholder="e.g. Two Sum (Sorted Array)" />
+        </div>
+        <div class="col-span-2">
+          <label class="lbl">URL</label>
+          <input id="mUrl" class="input w-full" placeholder="https://…" />
+        </div>
+        <div>
+          <label class="lbl">Difficulty</label>
+          <select id="mDiff" class="input w-full"><option value="">—</option><option>Easy</option><option>Medium</option><option>Hard</option></select>
+        </div>
+        <div>
+          <label class="lbl">Language</label>
+          <input id="mLang" class="input w-full" placeholder="C++, Python…" />
+        </div>
+        <div class="col-span-2">
+          <label class="lbl">Topics</label>
+          <input id="mTopics" class="input w-full" placeholder="Two Pointers, Array" />
+        </div>
+        <div class="col-span-2">
+          <label class="lbl">Your code (optional — tracked as a submission)</label>
+          <textarea id="mCode" rows="8" class="input w-full font-mono text-xs" placeholder="paste your solution here"></textarea>
+        </div>
+      </div>
+      <div class="flex gap-2 mt-4">
+        <button id="mSave" class="btn-primary">Save</button>
+        <button id="mCancel" class="btn-ghost">Cancel</button>
+      </div>
+      <div id="mErr" class="text-red-400 text-sm mt-2"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed bottom-5 right-5 hidden px-4 py-2 rounded-lg bg-panel2 border border-line text-sm shadow-lg z-40"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

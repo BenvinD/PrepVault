@@ -1,0 +1,66 @@
+# Cloud-style deployment: PrepVault + Postgres + Redis + a background worker.
+# Run:  docker compose up --build   then open http://localhost:8000
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: prepvault
+      POSTGRES_PASSWORD: prepvault
+      POSTGRES_DB: prepvault
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prepvault"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_MODE: cloud
+      DATABASE_URL: postgresql+psycopg://prepvault:prepvault@db:5432/prepvault
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_GATEWAY_URL: ${LLM_GATEWAY_URL:-https://api.openai.com/v1}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      VAULT_BACKEND: ${VAULT_BACKEND:-none}
+      VAULT_KEY: ${VAULT_KEY:-}
+    ports:
+      - "8000:8000"
+
+  worker:
+    build: .
+    command: arq app.workers.queue.WorkerSettings
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_MODE: cloud
+      DATABASE_URL: postgresql+psycopg://prepvault:prepvault@db:5432/prepvault
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_GATEWAY_URL: ${LLM_GATEWAY_URL:-https://api.openai.com/v1}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      VAULT_BACKEND: ${VAULT_BACKEND:-none}
+      VAULT_KEY: ${VAULT_KEY:-}
+
+volumes:
+  pgdata:
