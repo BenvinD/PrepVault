@@ -1,3 +1,6 @@
+# Dependencies for pip users. `pyproject.toml` is the source of truth; uv users
+# can ignore this file and run `uv sync` / `uv run` instead.
+
 # Web app
 fastapi>=0.115
 uvicorn[standard]>=0.30
@@ -5,19 +8,16 @@ sqlalchemy>=2.0
 alembic>=1.13
 pydantic>=2.7
 pydantic-settings>=2.3
+python-dotenv>=1.0       # .env loading for pydantic-settings
 email-validator>=2.1
 bcrypt>=4.1
 python-jose[cryptography]>=3.3
 python-multipart>=0.0.9
 requests>=2.31
-cryptography>=42.0   # secrets vault (Fernet envelope encryption)
+cryptography>=42.0       # secrets vault (Fernet envelope encryption)
 
 # Background workers (cloud mode) — local mode runs tasks inline, no Redis
 arq>=0.26
-
-# CLI tools (spreadsheet sync + insights)
-openpyxl>=3.1
-python-dotenv>=1.0
 
 # Postgres driver (cloud mode) — optional locally
 psycopg[binary]>=3.1; platform_system != "Windows"

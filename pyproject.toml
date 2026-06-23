@@ -1,0 +1,45 @@
+[project]
+name = "prepvault"
+version = "0.1.0"
+description = "Self-hosted, local-first interview-prep tracker: sync solved problems from online judges with a smart spaced-repetition revision queue and AI insights."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "AGPL-3.0-or-later"
+authors = [{ name = "Benvin D" }]
+keywords = [
+    "leetcode",
+    "hackerrank",
+    "codechef",
+    "interview-prep",
+    "spaced-repetition",
+    "coding-interview",
+    "fastapi",
+    "self-hosted",
+]
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "python-dotenv>=1.0",
+    "email-validator>=2.1",
+    "bcrypt>=4.1",
+    "python-jose[cryptography]>=3.3",
+    "python-multipart>=0.0.9",
+    "requests>=2.31",
+    "cryptography>=42.0",
+    "arq>=0.26",
+    "psycopg[binary]>=3.1; platform_system != 'Windows'",
+]
+
+[project.urls]
+Homepage = "https://github.com/BenvinD/PrepVault"
+Repository = "https://github.com/BenvinD/PrepVault"
+Issues = "https://github.com/BenvinD/PrepVault/issues"
+
+[tool.uv]
+# This is an application run via `uvicorn app.main:app`, not an installable
+# library — uv manages the environment and dependencies without building it.
+package = false

@@ -61,7 +61,7 @@ PrepVault is a single, self-hostable app that:
 | **Sync** | Pull your full solved list from LeetCode (cookie), HackerRank or CodeChef (public username + optional cookie). Connect **multiple accounts per judge**, resync any of them, and **unsync** one cleanly — removing only that account's problems, submissions and activity. |
 | **AI insights** | A short "key insight" per problem from any OpenAI-compatible LLM you configure. |
 | **Unified judges** | LeetCode, HackerRank, CodeChef and HelloInterview behind one `JudgeProvider` interface — adding Codeforces/AtCoder is a small, self-contained adapter. |
-| **Backup & transfer** | Export your data to a JSON file and import it on another machine — problems, submissions and activity merge with no duplicates (cookies excluded). |
+| **Backup & transfer** | Export your data to a JSON file — all of it, or just a **date range** via a date picker — and import it on another machine. Problems, submissions and activity merge with no duplicates (cookies excluded). |
 
 ---
 
@@ -70,10 +70,20 @@ PrepVault is a single, self-hostable app that:
 ```bash
 git clone https://github.com/BenvinD/PrepVault.git
 cd PrepVault
+```
 
+With [**uv**](https://docs.astral.sh/uv/) (recommended — creates the virtualenv
+and installs pinned deps from `uv.lock` automatically):
+
+```bash
+uv run uvicorn app.main:app --reload
+```
+
+…or with plain **pip**:
+
+```bash
 python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
 uvicorn app.main:app --reload
 ```
 
@@ -144,7 +154,7 @@ philosophy popularized by tools like LangChain).
 | **Auth** | bcrypt + JWT (`python-jose`) | Single implicit user locally; token auth in cloud. |
 | **Frontend** | Zero-build SPA — HTML + Tailwind (CDN) + vanilla JS | No bundler, no `node_modules`; ships as static files. |
 | **AI** | Any OpenAI-compatible chat API (OpenAI, OpenRouter, Groq, local) | Pluggable insights; entirely optional. |
-| **Packaging** | Docker + docker-compose | One command to stand up the cloud stack. |
+| **Packaging / deps** | [uv](https://docs.astral.sh/uv/) (or pip) · Docker + docker-compose | `pyproject.toml` + `uv.lock` for reproducible installs; one command to stand up the cloud stack. |
 
 ---
 
@@ -260,7 +270,7 @@ GET    /api/revision/queue               prioritized due batch + weakest topics
 POST   /api/sync                         pull solved problems from a judge (returns a job)
 POST   /api/sync/backfill                backfill submissions/activity (returns a job)
 GET    /api/jobs/{id}                    poll a background job's status + result
-GET    /api/export                       download all your data as a JSON file
+GET    /api/export[?from=&to=]           download your data as JSON (optional solved-date range)
 POST   /api/import                       merge an exported file (de-duplicated)
 POST   /api/auth/{register,login}        accounts (cloud mode)
 ```
