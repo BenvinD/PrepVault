@@ -319,7 +319,8 @@ function renderProblems(rows, mountId, withControls) {
           <span class="chev" data-id="${p.id}">▸</span> ${esc(p.title)}
         </div>
         <div class="text-muted text-xs">${esc(topicsText(p.topics))}</div>
-        ${p.approach ? `<div class="text-xs mt-1 text-slate-400 italic">${esc(p.approach)}</div>` : ""}
+        ${p.approach ? `<div class="text-xs mt-1 text-slate-400 italic">🤖 ${esc(p.approach)}</div>` : ""}
+        ${p.notes ? `<div class="text-xs mt-1 text-amber-400/80">📝 ${esc(p.notes)}</div>` : ""}
       </td>
       <td>${diffPill(p.difficulty)}</td>
       <td class="text-xs">${esc(langText(p.languages))}</td>
@@ -389,8 +390,25 @@ function renderDetail(cell, data) {
       <button class="btn-ghost ml-auto addsub" data-id="${p.id}">+ Add submission</button>
     </div>`;
   if (!subs.length) {
-    cell.innerHTML = `<div class="p-3">${meta}<div class="text-muted text-sm">No submissions yet. Use “+ Add submission” to paste your code.</div></div>`;
+    const notesEmpty = `
+      <div class="mt-4 border-t border-line pt-3">
+        <div class="text-muted text-xs uppercase tracking-wide mb-2">Your Notes</div>
+        <textarea id="notes-${p.id}" rows="4" class="input w-full text-sm font-mono" placeholder="Add your own notes, patterns, gotchas… (saved to your second brain)">${esc(p.notes || "")}</textarea>
+        <button class="btn-primary text-xs mt-2 save-notes" data-id="${p.id}">Save notes</button>
+      </div>`;
+    cell.innerHTML = `<div class="p-3">${meta}<div class="text-muted text-sm mb-2">No submissions yet. Use “+ Add submission” to paste your code.</div>${notesEmpty}</div>`;
     cell.querySelector(".addsub").addEventListener("click", () => addSubmission(p.id));
+    cell.querySelector(".save-notes").addEventListener("click", async function(e) {
+      const btn = e.currentTarget;
+      const id = btn.dataset.id;
+      const notes = document.getElementById(`notes-${id}`).value;
+      btn.textContent = "Saving…"; btn.disabled = true;
+      try {
+        await api(`/problems/${id}`, { method: "PATCH", body: JSON.stringify({ notes }) });
+        toast("Notes saved"); loadProblems();
+      } catch (err) { toast(err.message, false); }
+      finally { btn.textContent = "Save notes"; btn.disabled = false; }
+    });
     return;
   }
   const list = subs.map(s => `
@@ -406,9 +424,26 @@ function renderDetail(cell, data) {
       </div>
       <pre class="code-block hidden mt-2" id="code-${s.id}"></pre>
     </div>`).join("");
-  cell.innerHTML = `<div class="p-3">${meta}<div class="text-muted text-xs uppercase tracking-wide mb-2">Submissions</div>${list}</div>`;
+  const notesSection = `
+    <div class="mt-4 border-t border-line pt-3">
+      <div class="text-muted text-xs uppercase tracking-wide mb-2">Your Notes</div>
+      <textarea id="notes-${p.id}" rows="4" class="input w-full text-sm font-mono" placeholder="Add your own notes, patterns, gotchas… (saved to your second brain)">${esc(p.notes || "")}</textarea>
+      <button class="btn-primary text-xs mt-2 save-notes" data-id="${p.id}">Save notes</button>
+    </div>`;
+  cell.innerHTML = `<div class="p-3">${meta}<div class="text-muted text-xs uppercase tracking-wide mb-2">Submissions</div>${list}${notesSection}</div>`;
   cell.querySelectorAll(".viewcode").forEach(b => b.addEventListener("click", () => viewCode(b)));
   cell.querySelector(".addsub").addEventListener("click", () => addSubmission(p.id));
+  cell.querySelector(".save-notes").addEventListener("click", async function(e) {
+    const btn = e.currentTarget;
+    const id = btn.dataset.id;
+    const notes = document.getElementById(`notes-${id}`).value;
+    btn.textContent = "Saving…"; btn.disabled = true;
+    try {
+      await api(`/problems/${id}`, { method: "PATCH", body: JSON.stringify({ notes }) });
+      toast("Notes saved"); loadProblems();
+    } catch (err) { toast(err.message, false); }
+    finally { btn.textContent = "Save notes"; btn.disabled = false; }
+  });
 }
 
 async function addSubmission(problemId) {
@@ -751,7 +786,7 @@ function openModal() {
   // Default to HelloInterview if present (common manual case), else first.
   const hi = state.providers.find(p => p.name === "hellointerview");
   if (hi) sel.value = "hellointerview";
-  ["mTitle", "mUrl", "mTopics", "mLang", "mCode"].forEach(id => document.getElementById(id).value = "");
+  ["mTitle", "mUrl", "mTopics", "mLang", "mNotes", "mCode"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("mDiff").value = "";
   document.getElementById("mErr").textContent = "";
   modal.classList.remove("hidden"); modal.classList.add("flex");
@@ -777,6 +812,7 @@ document.getElementById("mSave").addEventListener("click", async () => {
       difficulty: document.getElementById("mDiff").value || null,
       topics: document.getElementById("mTopics").value.trim() || null,
       languages: lang,
+      notes: document.getElementById("mNotes").value.trim() || null,
     }) });
     if (code.trim()) {
       await api(`/problems/${p.id}/submissions/manual`, { method: "POST",

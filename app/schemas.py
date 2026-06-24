@@ -44,6 +44,7 @@ class ProblemBase(BaseModel):
     confidence: int | None = None
     revisit: bool = False
     approach: str | None = None
+    notes: str | None = None
 
 
 class ProblemCreate(ProblemBase):
@@ -54,6 +55,7 @@ class ProblemUpdate(BaseModel):
     confidence: int | None = None
     revisit: bool | None = None
     approach: str | None = None
+    notes: str | None = None
     last_revised: date | None = None
     difficulty: str | None = None
     topics: str | None = None

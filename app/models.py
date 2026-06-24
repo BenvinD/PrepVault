@@ -78,6 +78,7 @@ class Problem(Base):
     confidence: Mapped[int | None] = mapped_column(Integer, nullable=True)
     revisit: Mapped[bool] = mapped_column(Boolean, default=False)
     approach: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     source: Mapped[str] = mapped_column(String(20), default="sync")  # sync | manual
     submissions_fetched: Mapped[bool] = mapped_column(Boolean, default=False)

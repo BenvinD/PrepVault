@@ -38,7 +38,7 @@ from .revision import compute_next_revision
 EXPORT_VERSION = 1
 
 # User-editable fields reconciled with "newest updated_at wins" on merge.
-_MERGEABLE_FIELDS = ("confidence", "revisit", "approach", "status", "last_revised")
+_MERGEABLE_FIELDS = ("confidence", "revisit", "approach", "notes", "status", "last_revised")
 
 
 def _acc(account: str | None) -> str:
@@ -110,6 +110,7 @@ def _problem_to_dict(problem: Problem) -> dict:
         "confidence": problem.confidence,
         "revisit": problem.revisit,
         "approach": problem.approach,
+        "notes": problem.notes,
         "source": problem.source,
         "submissions_fetched": problem.submissions_fetched,
         "created_at": _iso(problem.created_at),
@@ -210,6 +211,7 @@ def _new_problem(user_id: int, pd: dict) -> Problem:
         confidence=pd.get("confidence"),
         revisit=bool(pd.get("revisit", False)),
         approach=pd.get("approach"),
+        notes=pd.get("notes"),
         source=pd.get("source") or "sync",
         submissions_fetched=bool(pd.get("submissions_fetched", False)),
     )
@@ -310,6 +312,8 @@ def _merge_into(db: Session, user: User, problem: Problem, pd: dict) -> int:
             problem.confidence = pd.get("confidence")
         if pd.get("approach"):
             problem.approach = pd.get("approach")
+        if pd.get("notes"):
+            problem.notes = pd.get("notes")
         if pd.get("status"):
             problem.status = pd.get("status")
         problem.revisit = bool(pd.get("revisit", problem.revisit))

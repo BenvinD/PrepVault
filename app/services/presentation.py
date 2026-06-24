@@ -106,6 +106,7 @@ def unify_problem(p: Problem) -> dict:
         "confidence": p.confidence,
         "revisit": p.revisit,
         "approach": p.approach,
+        "notes": p.notes,
         "source": p.source,
         "submissions_fetched": p.submissions_fetched,
     }
